@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-heading: "Outfit", system-ui, sans-serif;
+  
+  --color-primary-50: #f4f6f8;
+  --color-primary-100: #e2e8f0;
+  --color-primary-200: #cbd5e1;
+  --color-primary-300: #94a3b8;
+  --color-primary-400: #64748b;
+  --color-primary-500: #475569;
+  --color-primary-600: #334155;
+  --color-primary-700: #1e293b;
+  --color-primary-800: #0f172a;
+  --color-primary-900: #020617; /* Deep Navy */
+
+  /* Accent - Intelligent Blue */
+  --color-accent-500: #2563eb;
+  --color-accent-600: #1d4ed8;
+
+  /* Warm Neutral / Soft Stone Canvas */
+  --color-neutral-50: #fbfbf9; /* Warm white */
+  --color-neutral-100: #f4f4f0; /* Canvas */
+  --color-neutral-200: #e7e7e3;
+  --color-neutral-300: #d6d6cf;
+  --color-neutral-400: #a3a39b; /* Muted Slate */
+  --color-neutral-500: #787871;
+  --color-neutral-600: #575752;
+  --color-neutral-700: #42423e;
+  --color-neutral-800: #2b2b28;
+  --color-neutral-900: #171715;
+
+  --color-success-50: #f0fdf4;
+  --color-success-600: #15803d; /* Restrained green */
+  
+  --color-warning-50: #fffbeb;
+  --color-warning-600: #b45309; /* Restrained amber */
+  
+  --color-error-50: #fef2f2;
+  --color-error-600: #b91c1c;
+
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.5s ease-out;
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-shimmer: shimmer 2s infinite linear;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@layer base {
+  body {
+    @apply text-neutral-900 bg-neutral-100 antialiased font-sans selection:bg-primary-200 selection:text-primary-900;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight text-neutral-900;
+  }
+}
+
+@layer utilities {
+  .hover-lift {
+    @apply transition-transform duration-200 hover:-translate-y-0.5;
+  }
+
+  /* Hide scrollbars visually but allow functional scrolling */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Financial Intelligence Background Grid */
+  .bg-grid-pattern {
+    background-size: 48px 48px;
+    background-image: 
+      linear-gradient(to right, var(--color-neutral-200) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-neutral-200) 1px, transparent 1px);
+    background-position: center top;
+  }
+  
+  @media (min-width: 768px) {
+    .bg-grid-pattern {
+      background-size: 80px 80px;
+    }
+  }
+
+  .bg-grid-pattern-subtle {
+    background-size: 48px 48px;
+    background-image: 
+      linear-gradient(to right, color-mix(in srgb, var(--color-neutral-200) 40%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--color-neutral-200) 40%, transparent) 1px, transparent 1px);
+    background-position: center top;
+  }
+  
+  @media (min-width: 768px) {
+    .bg-grid-pattern-subtle {
+      background-size: 80px 80px;
+    }
+  }
+}

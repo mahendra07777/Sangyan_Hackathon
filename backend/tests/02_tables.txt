@@ -1,0 +1,5 @@
+Financial Summary:
+| Metric | Value |
+|---|---|
+| Revenue | $1.2B |
+| EBITDA | $300M |

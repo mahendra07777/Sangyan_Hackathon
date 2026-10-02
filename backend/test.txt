@@ -1,0 +1,6 @@
+This is a test plain text document for Bharat Investor Copilot.
+
+Revenue increased by 15% to reach 2.3 lakh crore rupees.
+EBITDA margin is 18.2%.
+
+This should be chunked separately if separated by double newlines.
