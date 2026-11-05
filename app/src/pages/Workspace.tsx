@@ -226,7 +226,7 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                   {intel.document_story || intel.simple_summary}
                 </p>
               ) : (
-                <p className="text-[13px] text-neutral-500 font-medium">Processing incomplete.</p>
+                <p className="text-[13px] text-neutral-500 font-medium">{t("ws.processing_incomplete")}</p>
               )}
             </div>
 
@@ -367,14 +367,14 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                             onClick={() => handleAsk(`How does ${term.term} affect the overall health of the business?`)}
                           >
                             <CornerDownRight className="w-3.5 h-3.5 opacity-70" />
-                            How does this affect overall health?
+                            {t("ws.questions.health")}
                           </button>
                           <button 
                             className="flex items-center gap-2 text-[12px] font-bold text-accent-600 hover:text-accent-700 transition-colors"
                             onClick={() => handleAsk(`What usually causes ${term.term} to change?`)}
                           >
                             <CornerDownRight className="w-3.5 h-3.5 opacity-70" />
-                            What usually causes this to change?
+                            {t("ws.questions.causes")}
                           </button>
                         </div>
                       </div>
@@ -459,9 +459,9 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                             <button 
                               className="flex items-center gap-1.5 text-[9px] font-bold text-primary-900 bg-neutral-50 border border-neutral-200 px-2.5 py-1 rounded-[4px] uppercase tracking-widest hover:bg-neutral-100 transition-colors shadow-sm"
                               onClick={() => setActiveEvidence({
-                                claim: "AI Explanation",
-                                evidence: msg.responseMeta?.evidence_snippet || "Snippet available.",
-                                source: msg.responseMeta?.source_reference || "Document"
+                                claim: t("ws.evidence.ai_explanation"),
+                                evidence: msg.responseMeta?.evidence_snippet || t("ws.evidence.snippet_available"),
+                                source: msg.responseMeta?.source_reference || t("ws.document")
                               })}
                             >
                               {t("ws.evidence.source")} · {msg.responseMeta?.source_reference || 'Document'}

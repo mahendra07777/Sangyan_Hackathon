@@ -113,7 +113,7 @@ export function Home({ onDocumentReady, language }: HomeProps) {
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-success-600"></div>
-                  <span className="text-[12px] font-bold text-success-600">+13.9% YoY</span>
+                  <span className="text-[12px] font-bold text-success-600">{t("home.yoy_change")}</span>
                 </div>
               </div>
 
@@ -122,7 +122,7 @@ export function Home({ onDocumentReady, language }: HomeProps) {
                   <div className="absolute -left-[25.5px] top-1.5 w-2.5 h-2.5 bg-neutral-100 border-2 border-neutral-300 rounded-full"></div>
                   <p className="text-[10px] font-bold text-accent-600 uppercase tracking-widest mb-1">{t("home.bharat_explains")}</p>
                   <p className="text-[14px] font-medium text-primary-900">
-                    Revenue increased 13.9% year over year.
+                    {t("home.preview.explanation")}
                   </p>
                 </div>
                 
@@ -130,7 +130,7 @@ export function Home({ onDocumentReady, language }: HomeProps) {
                   <div className="absolute -left-[25.5px] top-1.5 w-2.5 h-2.5 bg-neutral-100 border-2 border-neutral-300 rounded-full"></div>
                   <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{t("home.why_it_matters")}</p>
                   <p className="text-[13px] font-medium text-neutral-600">
-                    Revenue describes the scale of business activity.
+                    {t("home.preview.why_matters")}
                   </p>
                 </div>
 
@@ -151,7 +151,7 @@ export function Home({ onDocumentReady, language }: HomeProps) {
               </div>
               <div className="bg-white border border-neutral-200 rounded p-3 text-[13px] font-medium text-primary-900 shadow-sm">
                 <span className="text-accent-600 font-bold mr-2">↳</span>
-                Revenue ka simple matlab hai ki company ne is quarter mein kitna paisa kamaya hai.
+                {t("home.preview.chat_reply")}
               </div>
             </div>
           </div>
@@ -219,7 +219,7 @@ export function Home({ onDocumentReady, language }: HomeProps) {
             <span className="text-[11px] font-bold bg-neutral-100 text-neutral-500 px-3 py-1.5 rounded-[4px] uppercase tracking-widest border border-neutral-200">Hinglish</span>
           </div>
           <div className="bg-neutral-50 p-4 border border-neutral-200 rounded-[4px]">
-            <p className="text-[14px] font-medium text-primary-900 italic">"Revenue ka simple matlab kya hai?"</p>
+            <p className="text-[14px] font-medium text-primary-900 italic">{t("home.lang.sample")}</p>
           </div>
         </div>
 
@@ -232,7 +232,7 @@ export function Home({ onDocumentReady, language }: HomeProps) {
             <div className="w-10 h-10 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-primary-900">
               <Mic className="w-4 h-4" />
             </div>
-            <p className="text-[14px] font-medium text-primary-900 italic">"Revenue ka simple meaning kya hai?"</p>
+            <p className="text-[14px] font-medium text-primary-900 italic">{t("home.voice.sample")}</p>
           </div>
           
           <p className="text-[14px] font-medium text-neutral-600">

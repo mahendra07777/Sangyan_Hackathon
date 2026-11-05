@@ -150,7 +150,7 @@ function App() {
                 }}
               />
               
-              {LANGUAGES.map((lang, idx) => (
+              {LANGUAGES.map((lang) => (
                 <button
                   key={lang}
                   onClick={() => handleLanguageChange(lang)}
