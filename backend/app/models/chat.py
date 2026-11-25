@@ -10,6 +10,12 @@ class ChatRequest(BaseModel):
     history: List[ChatMessage] = []
     document_context: str = ""
     language: str = "English"
+    mode: str = "local"  # "local" or "ai"
+    document_id: Optional[str] = None
+    challenge_id: Optional[str] = None
+    consent_token: Optional[str] = None
+    ai_session_id: Optional[str] = None
+    ai_session_token: Optional[str] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -32,3 +38,7 @@ class ChatResponse(BaseModel):
     uncertainty_note: Optional[str] = None
     language: str = "en"
     safety_state: str = "SAFE"
+    mode: str = "LOCAL_MODE"
+    fallback_triggered: bool = False
+    fallback_message: Optional[str] = None
+

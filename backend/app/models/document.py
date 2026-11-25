@@ -59,6 +59,11 @@ class DocumentIntelligence(BaseModel):
     important_sections: List[str] = Field(default_factory=list)
     uncertainty_notes: List[str] = Field(default_factory=list)
     source_references: List[str] = Field(default_factory=list)
+    mode: str = "LOCAL_MODE"  # LOCAL_MODE, AI_CONSENTED, LOCAL_MODE_FALLBACK
+    fallback_triggered: bool = False
+    fallback_reason: Optional[str] = None
+    fallback_message: Optional[str] = None
+
 
 class DocumentChunk(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -91,3 +96,75 @@ class DocumentProcessResult(BaseModel):
     document: Document
     message: str = "Processing completed"
     error: Optional[str] = None
+
+
+class ConsentPreviewRequest(BaseModel):
+    document_id: str
+    operation: str  # "EXPLAIN", "CHAT", "TRANSLATE"
+
+
+class ConsentPreviewResponse(BaseModel):
+    challenge_id: str
+    document_id: str
+    operation: str
+    recipient: str = "Google Gemini API"
+    purpose: str
+    payload_preview: str
+    payload_hash: str
+    expires_in_seconds: int = 600
+    disclosure_statement: str
+
+
+class ConsentConfirmRequest(BaseModel):
+    challenge_id: str
+    document_id: str
+    operation: str
+    payload_hash: str
+
+
+class ConsentConfirmResponse(BaseModel):
+    challenge_id: str
+    consent_token: str
+    expires_in_seconds: int = 600
+    operation: str
+    document_id: str
+
+
+class AIAnalyzeRequest(BaseModel):
+    document_id: str
+    challenge_id: Optional[str] = None
+    consent_token: Optional[str] = None
+    ai_session_id: Optional[str] = None
+    ai_session_token: Optional[str] = None
+    language: str = "English"
+
+
+class AISessionPreviewResponse(BaseModel):
+    activation_id: str
+    recipient: str = "Google Gemini API"
+    purpose: str
+    disclosure_items: List[str]
+    disclosure_statement: str
+    expires_in_seconds: int = 600
+
+
+class AISessionActivateRequest(BaseModel):
+    activation_id: str
+
+
+class AISessionActivateResponse(BaseModel):
+    ai_session_id: str
+    ai_session_token: str
+    expires_in_seconds: int = 3600
+    active: bool = True
+
+
+class AISessionCredentialsRequest(BaseModel):
+    ai_session_id: str
+    ai_session_token: str
+
+
+class AISessionStatusResponse(BaseModel):
+    active: bool
+    expires_in_seconds: int = 0
+
