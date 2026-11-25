@@ -1,17 +1,18 @@
 import { useState, useRef } from "react";
-import { Upload, Loader2, AlertCircle, Mic, ArrowRight } from "lucide-react";
+import { Upload, Loader2, AlertCircle, Mic, ArrowRight, Layers } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { uploadDocument } from "../lib/api";
+import { uploadDocument, type ProcessedDocument, type AISessionCredentials } from "../lib/api";
 import { getTranslation } from "../lib/translations";
 import type { SupportedLanguage } from "../lib/translations";
-import type { ProcessedDocument } from "../lib/api";
 
 interface HomeProps {
   onDocumentReady: (doc: ProcessedDocument) => void;
+  onOpenCompare: () => void;
   language: string;
+  aiSession?: AISessionCredentials | null;
 }
 
-export function Home({ onDocumentReady, language }: HomeProps) {
+export function Home({ onDocumentReady, onOpenCompare, language, aiSession = null }: HomeProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +26,12 @@ export function Home({ onDocumentReady, language }: HomeProps) {
     setIsUploading(true);
     setError(null);
     try {
-      const result = await uploadDocument(file, language);
+      const result = await uploadDocument(
+        file,
+        language,
+        aiSession ? "ai" : "local",
+        aiSession
+      );
       onDocumentReady(result.document);
     } catch (err: any) {
       setError(err.message || t("error.failed"));
@@ -93,6 +99,34 @@ export function Home({ onDocumentReady, language }: HomeProps) {
                 <p className="font-medium">{error}</p>
               </div>
             )}
+          </div>
+
+          {/* COMPARE DOCUMENTS ENTRY CARD */}
+          <div
+            onClick={onOpenCompare}
+            className="bg-white border-2 border-accent-200/80 hover:border-accent-500 rounded-[8px] p-4 sm:p-5 shadow-xs max-w-md transition-all cursor-pointer group hover:shadow-md"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-lg bg-accent-50 text-accent-700 flex items-center justify-center shrink-0 group-hover:bg-accent-600 group-hover:text-white transition-colors">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[14px] font-bold text-neutral-900 group-hover:text-accent-700 transition-colors">
+                      {t("compare.nav.button")}
+                    </p>
+                    <span className="text-[10px] font-extrabold uppercase bg-accent-100 text-accent-800 px-2 py-0.5 rounded-full">
+                      New
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 font-medium leading-snug mt-0.5">
+                    {t("compare.nav.sub")}
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-accent-600 transition-transform group-hover:translate-x-1 shrink-0 ml-2" />
+            </div>
           </div>
         </div>
 

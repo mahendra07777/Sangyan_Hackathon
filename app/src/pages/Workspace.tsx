@@ -1,16 +1,19 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText, Loader2, Mic, FileSearch, CornerDownRight, ArrowRight } from "lucide-react";
+import { FileText, Loader2, Mic, FileSearch, CornerDownRight, ArrowRight, Sparkles, Shield } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { sendChatMessage } from "../lib/api";
-import { getTranslation } from "../lib/translations";
-import type { SupportedLanguage } from "../lib/translations";
-import type { ProcessedDocument, ChatMessage, ChatResponse } from "../lib/api";
+import { SafeMarkdown } from "../components/ui/SafeMarkdown";
+import { sendChatMessage, type AISessionCredentials, type ProcessedDocument, type ChatMessage, type ChatResponse } from "../lib/api";
+import { getTranslation, type SupportedLanguage } from "../lib/translations";
 
 interface WorkspaceProps {
   document: ProcessedDocument;
   onBack: () => void;
   language: string;
   isTranslating?: boolean;
+  isAiExplaining?: boolean;
+  aiSession?: AISessionCredentials | null;
+  onEnableAi?: () => void;
+  onDisableAi?: () => void;
 }
 
 interface UIMessage extends ChatMessage {
@@ -18,10 +21,19 @@ interface UIMessage extends ChatMessage {
   responseMeta?: ChatResponse;
 }
 
-export function Workspace({ document, onBack, language, isTranslating = false }: WorkspaceProps) {
+export function Workspace({
+  document,
+  onBack,
+  language,
+  isTranslating = false,
+  isAiExplaining = false,
+  aiSession = null,
+  onEnableAi,
+  onDisableAi,
+}: WorkspaceProps) {
   const intel = document.intelligence;
   const t = (key: string) => getTranslation(key, language as SupportedLanguage);
-  
+
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -37,12 +49,18 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
   } | null>(null);
 
   useEffect(() => {
+    setMessages([]);
+    setInputValue("");
+    setActiveEvidence(null);
+  }, [document.id]);
+
+  useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = true;
-      
+
       if (language === "Hindi" || language === "Hinglish") {
         recognition.lang = 'hi-IN';
       } else {
@@ -50,7 +68,7 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
       }
 
       recognition.onstart = () => setIsRecording(true);
-      
+
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
         let interimTranscript = '';
@@ -102,12 +120,13 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
   }, [messages, isLoading]);
 
   const handleAsk = async (text: string = inputValue) => {
-    if (!text.trim() || isLoading) return;
+    const trimmed = text.trim();
+    if (!trimmed || isLoading) return;
 
     const userMessage: UIMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: text.trim(),
+      content: trimmed,
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -115,27 +134,26 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
     setIsLoading(true);
 
     try {
-      let docContext = "";
-      if (document.intelligence) {
-        docContext = JSON.stringify(document.intelligence);
-      } else if (document.sections && document.sections.length > 0) {
-        docContext = document.sections.map(s => `Page ${s.page_number}: ${s.content}`).join("\n\n");
-      }
-
+      const rawSections = (document.sections || []).map((s) => s.content).join("\n");
+      const docContext = rawSections || (document.intelligence ? JSON.stringify(document.intelligence) : "");
       const history = messages.map(m => ({ role: m.role, content: m.content }));
 
       const response = await sendChatMessage({
         message: userMessage.content,
         history,
         document_context: docContext,
-        language
+        language,
+        mode: aiSession ? "ai" : "local",
+        document_id: document.id,
+        ai_session_id: aiSession?.aiSessionId,
+        ai_session_token: aiSession?.aiSessionToken,
       });
 
       const assistantMessage: UIMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: response.answer,
-        responseMeta: response
+        responseMeta: response,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -151,9 +169,12 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
     }
   };
 
+  const isBusyProcessing = isAiExplaining || isTranslating;
+  const isAiOutput = intel?.mode === "AI_CONSENTED" && !intel?.fallback_triggered;
+
   return (
     <div className="flex-1 flex flex-col h-full bg-neutral-100 font-sans text-neutral-900">
-      
+
       {/* Evidence Drawer Modal */}
       {activeEvidence && (
         <div className="fixed inset-0 z-50 flex items-center justify-end bg-primary-900/40 backdrop-blur-sm animate-fade-in pr-4 pb-4 pt-4">
@@ -198,37 +219,139 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
             <span className="truncate max-w-[200px] sm:max-w-xs">{document.filename}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-primary-900 bg-neutral-100 border border-neutral-200 px-2.5 py-0.5 rounded">
-          {language}
+
+        <div className="flex items-center gap-2">
+          {/* Subtle Processing Status Indicator */}
+          <span
+            data-testid="workspace-status-indicator"
+            className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 shadow-sm border ${
+              isBusyProcessing
+                ? "text-accent-800 bg-accent-50 border-accent-200"
+                : isAiOutput
+                ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                : "text-amber-800 bg-amber-50 border-amber-200"
+            }`}
+          >
+            {isBusyProcessing ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin text-accent-600" />
+                {t("ai.status.processing")}
+              </>
+            ) : isAiOutput ? (
+              <>
+                <Sparkles className="w-3 h-3 text-emerald-600" />
+                {t("ai.status.ai_response")}
+              </>
+            ) : (
+              <>
+                <Shield className="w-3 h-3 text-amber-600" />
+                {t("ai.status.local_fallback")}
+              </>
+            )}
+          </span>
+
+          {/* Privacy control: Disable active external AI OR allow enabling external AI if inactive */}
+          {aiSession ? (
+            onDisableAi && (
+              <button
+                type="button"
+                data-testid="disable-ai-btn"
+                onClick={onDisableAi}
+                className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+              >
+                {t("ai.control.disable")}
+              </button>
+            )
+          ) : (
+            onEnableAi && (
+              <button
+                type="button"
+                data-testid="enable-ai-btn"
+                onClick={onEnableAi}
+                className="text-[10px] font-bold uppercase tracking-wider text-accent-700 hover:text-accent-900 bg-accent-50 hover:bg-accent-100 border border-accent-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+              >
+                {t("ai.control.enable")}
+              </button>
+            )
+          )}
+
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-primary-900 bg-neutral-100 border border-neutral-200 px-2.5 py-0.5 rounded">
+            {language}
+          </div>
         </div>
       </header>
 
       {/* Workspace Area */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden w-full relative">
-        
+
         {/* Left Panel - Document Intelligence */}
         <div className="w-full md:w-[45%] lg:w-[40%] border-r border-neutral-200 bg-neutral-50 bg-grid-pattern-subtle overflow-y-auto hide-scrollbar flex flex-col z-10 relative">
-          
-          {/* Shimmer Overlay during translation */}
-          <div className={`absolute inset-0 z-20 pointer-events-none transition-opacity duration-500 bg-gradient-to-b from-white/0 via-white/50 to-white/0 ${isTranslating ? 'opacity-100' : 'opacity-0'}`}>
+
+          {/* Shimmer Overlay during AI processing / translation */}
+          <div className={`absolute inset-0 z-20 pointer-events-none transition-opacity duration-500 bg-gradient-to-b from-white/0 via-white/50 to-white/0 ${isBusyProcessing ? 'opacity-100' : 'opacity-0'}`}>
             <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_20%,rgba(255,255,255,0.7)_50%,transparent_80%)] bg-[length:200%_100%] animate-shimmer" style={{ animation: 'shimmer 2s infinite linear' }}></div>
           </div>
 
-          <div className={`p-6 md:p-8 space-y-12 transition-all duration-500 ${isTranslating ? 'opacity-50 blur-[1px]' : 'opacity-100 blur-0'}`}>
-            
+          <div className={`p-6 md:p-8 space-y-12 transition-all duration-500 ${isBusyProcessing ? 'opacity-50 blur-[1px]' : 'opacity-100 blur-0'}`}>
+
             {/* Document Story */}
             <div className="space-y-3" key={`story-${language}`}>
               <h2 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-2 transition-all duration-300 animate-slide-up">
                 <span className="w-1 h-2.5 bg-primary-900"></span>{t("ws.document_story")}
               </h2>
+              {intel?.fallback_message && (
+                <div
+                  data-testid="workspace-fallback-notice"
+                  className="bg-amber-50 border border-amber-200 text-amber-900 text-[12px] p-3 rounded-[6px] mb-2 font-medium"
+                >
+                  {intel.fallback_message}
+                </div>
+              )}
               {intel ? (
                 <p className="text-[15px] text-primary-900 font-medium leading-relaxed transition-all duration-300 animate-slide-up">
-                  {intel.document_story || intel.simple_summary}
+                  {intel.document_story || (intel.simple_summary && !intel.simple_summary.includes("503") && !intel.simple_summary.includes("Failed to analyze") ? intel.simple_summary : "Document analysis generated locally from extracted text and tables.")}
                 </p>
               ) : (
                 <p className="text-[13px] text-neutral-500 font-medium">{t("ws.processing_incomplete")}</p>
               )}
             </div>
+
+            {/* Key Extracted Facts (always preserved across AI and local fallback) */}
+            {intel?.key_facts && intel.key_facts.length > 0 && (
+              <div className="space-y-3" key={`facts-${language}`}>
+                <h2 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-1 h-2.5 bg-primary-900"></span>{t("ws.key_numbers")}
+                </h2>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {intel.key_facts.map((fact, idx) => (
+                    <div key={idx} className="bg-white border border-neutral-200 rounded-[6px] p-3.5 shadow-sm">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-[12px] font-bold text-primary-900">{fact.label}</span>
+                        <span className="text-[13px] font-extrabold text-primary-900">
+                          {fact.value}{fact.unit ? ` ${fact.unit}` : ""}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-600 mt-1 leading-relaxed">{fact.explanation}</p>
+                      <div className="mt-2 flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[10px] px-2 text-accent-600 hover:bg-accent-50 transition-colors"
+                          onClick={() => setActiveEvidence({
+                            claim: `${fact.label}: ${fact.value}${fact.unit ? ` ${fact.unit}` : ""}`,
+                            evidence: fact.explanation,
+                            source: fact.evidence_reference,
+                          })}
+                        >
+                          <FileSearch className="w-3 h-3 mr-1" />
+                          {fact.evidence_reference}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* WHAT CHANGED? */}
             {intel?.changes && intel.changes.length > 0 && (
@@ -251,7 +374,7 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                         </div>
                       )}
                       <p className="text-[12px] text-neutral-600 font-medium leading-relaxed">{change.explanation}</p>
-                      
+
                       <div className="mt-3 flex justify-end">
                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-accent-600 hover:bg-accent-50 transition-colors" onClick={() => setActiveEvidence({ claim: `Change in ${change.metric}`, evidence: `Context provided in document regarding ${change.metric}.`, source: change.evidence_reference })}>
                             <FileSearch className="w-3 h-3 mr-1" />
@@ -275,7 +398,7 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                       <div key={idx} className="bg-white border border-neutral-200 rounded-[6px] p-4 shadow-sm animate-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
                          <p className="text-[14px] font-bold text-primary-900 leading-snug mb-2">{rel.observation}</p>
                          <p className="text-[13px] text-neutral-600 mb-3 leading-relaxed">{rel.why_it_may_matter}</p>
-                         
+
                          {rel.uncertainty && (
                             <div className="bg-warning-50 p-2.5 rounded-[4px] text-[11.5px] text-warning-700 font-medium mb-3 border border-warning-100">
                                {rel.uncertainty}
@@ -330,7 +453,6 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                </div>
             )}
 
-
             {/* Impact Lens */}
             {intel?.financial_terms && intel.financial_terms.length > 0 && (
               <div className="space-y-8 pb-12 relative before:absolute before:-inset-6 before:bg-grid-pattern before:opacity-30 before:-z-10 before:pointer-events-none">
@@ -338,20 +460,19 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                   <h2 className="text-[12px] font-bold text-primary-900 uppercase tracking-widest">{t("ws.impact_lens")}</h2>
                   <span className="text-[11px] font-medium text-neutral-500 ml-2">{t("ws.impact_lens.sub")}</span>
                 </div>
-                
+
                 {intel.financial_terms.map((term, idx) => (
                   <div key={idx} className="space-y-5 pt-1">
                     <p className="font-extrabold text-[20px] text-primary-900 font-heading tracking-tight">{term.term}</p>
-                    
-                    {/* Visual Reasoning Path (matches Intelligence Path) */}
+
                     <div className="pl-5 border-l-2 border-neutral-200 space-y-6 ml-2 relative">
-                      
+
                       <div className="relative">
                         <div className="absolute -left-[27px] top-1.5 w-2.5 h-2.5 bg-neutral-100 border-2 border-neutral-300 rounded-full"></div>
                         <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{t("ws.concept")}</p>
                         <p className="text-[14px] text-primary-900 font-medium leading-relaxed">{term.plain_language_definition}</p>
                       </div>
-                      
+
                       <div className="relative">
                         <div className="absolute -left-[27px] top-1.5 w-2.5 h-2.5 bg-neutral-100 border-2 border-neutral-300 rounded-full"></div>
                         <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{t("ws.why_matters")}</p>
@@ -362,14 +483,14 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                         <div className="absolute -left-[27px] top-1.5 w-2.5 h-2.5 bg-neutral-100 border-2 border-neutral-300 rounded-full"></div>
                         <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-2">{t("ws.questions")}</p>
                         <div className="space-y-2">
-                          <button 
+                          <button
                             className="flex items-center gap-2 text-[12px] font-bold text-accent-600 hover:text-accent-700 transition-colors"
                             onClick={() => handleAsk(`How does ${term.term} affect the overall health of the business?`)}
                           >
                             <CornerDownRight className="w-3.5 h-3.5 opacity-70" />
                             {t("ws.questions.health")}
                           </button>
-                          <button 
+                          <button
                             className="flex items-center gap-2 text-[12px] font-bold text-accent-600 hover:text-accent-700 transition-colors"
                             onClick={() => handleAsk(`What usually causes ${term.term} to change?`)}
                           >
@@ -381,10 +502,10 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
 
                       <div className="relative pt-2">
                         <div className="absolute -left-[27px] top-3.5 w-2.5 h-2.5 bg-white border-2 border-accent-500 rounded-full"></div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-[10px] text-primary-900 font-bold uppercase tracking-widest border-neutral-300 bg-white hover:border-accent-500 hover:text-accent-600 transition-colors rounded-[4px] shadow-sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-[10px] text-primary-900 font-bold uppercase tracking-widest border-neutral-300 bg-white hover:border-accent-500 hover:text-accent-600 transition-colors rounded-[4px] shadow-sm"
                           onClick={() => setActiveEvidence({ claim: `Definition of ${term.term}`, evidence: `Context provided in document regarding ${term.term}.`, source: term.evidence_reference })}
                         >
                           <FileSearch className="w-3 h-3 mr-1.5 text-accent-500" />
@@ -401,7 +522,7 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
 
         {/* Right Panel - ASK BHARAT */}
         <div className="w-full md:w-[55%] lg:w-[60%] bg-white bg-grid-pattern-subtle flex flex-col h-full relative">
-          
+
           <div className="px-6 md:px-10 py-3 border-b border-neutral-100 flex items-center justify-between shrink-0 bg-neutral-50/50">
             <h2 className="text-[11px] font-bold text-primary-900 uppercase tracking-widest flex items-center gap-2">
                {t("home.ask_bharat")}
@@ -415,7 +536,7 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
                 <h3 className="text-[24px] font-extrabold text-primary-900 font-heading tracking-tight leading-snug">
                   {t("qa.greeting")}
                 </h3>
-                
+
                 <div className="w-full space-y-2 mt-6">
                   {[
                     t("qa.q1"),
@@ -433,53 +554,80 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
 
             {/* Chat Messages */}
             <div className="space-y-10 pb-4">
-              {messages.map((msg) => (
-                <div key={msg.id} className="flex flex-col animate-slide-up">
-                  {msg.role === 'user' ? (
-                    <div className="flex gap-4 items-start self-end max-w-[85%]">
-                      <div className="bg-neutral-100 border border-neutral-200 rounded-[8px] rounded-tr-none p-3 shadow-sm">
-                        <p className="text-[14px] font-medium text-primary-900 leading-relaxed">{msg.content}</p>
+              {messages.map((msg) => {
+                const isMsgAi = msg.responseMeta?.mode === "AI_CONSENTED" && !msg.responseMeta?.fallback_triggered;
+                return (
+                  <div key={msg.id} className="flex flex-col animate-slide-up">
+                    {msg.role === 'user' ? (
+                      <div className="flex gap-4 items-start self-end max-w-[85%]">
+                        <div className="bg-neutral-100 border border-neutral-200 rounded-[8px] rounded-tr-none p-3 shadow-sm">
+                          <p className="text-[14px] font-medium text-primary-900 leading-relaxed">{msg.content}</p>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-4 max-w-[90%]">
-                      {/* Editorial Intelligence format */}
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <span className="w-1 h-3 bg-accent-500 block"></span>
-                          <span className="text-[10px] font-bold text-accent-600 uppercase tracking-widest">{t("home.bharat_explains")}</span>
-                        </div>
-                        
-                        <div className="text-[14px] text-primary-900 leading-relaxed font-medium whitespace-pre-wrap">
-                          {msg.content}
-                        </div>
-
-                        {msg.responseMeta && (msg.responseMeta.evidence_snippet || msg.responseMeta.source_reference) && (
-                          <div className="mt-4 pt-3 border-t border-neutral-100 flex flex-col items-start gap-2">
-                            <button 
-                              className="flex items-center gap-1.5 text-[9px] font-bold text-primary-900 bg-neutral-50 border border-neutral-200 px-2.5 py-1 rounded-[4px] uppercase tracking-widest hover:bg-neutral-100 transition-colors shadow-sm"
-                              onClick={() => setActiveEvidence({
-                                claim: t("ws.evidence.ai_explanation"),
-                                evidence: msg.responseMeta?.evidence_snippet || t("ws.evidence.snippet_available"),
-                                source: msg.responseMeta?.source_reference || t("ws.document")
-                              })}
-                            >
-                              {t("ws.evidence.source")} · {msg.responseMeta?.source_reference || 'Document'}
-                              <FileSearch className="w-3 h-3 ml-1 text-accent-500" />
-                            </button>
+                    ) : (
+                      <div className="flex flex-col gap-4 max-w-[90%]">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-1 h-3 bg-accent-500 block"></span>
+                              <span className="text-[10px] font-bold text-accent-600 uppercase tracking-widest">{t("home.bharat_explains")}</span>
+                            </div>
+                            {msg.responseMeta && (
+                              <span
+                                data-testid="chat-response-source-badge"
+                                className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                  isMsgAi
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-amber-50 text-amber-800 border-amber-200"
+                                }`}
+                              >
+                                {isMsgAi ? t("ai.status.ai_response") : t("ai.status.local_fallback")}
+                              </span>
+                            )}
                           </div>
-                        )}
+
+                          {msg.responseMeta?.fallback_triggered && msg.responseMeta?.fallback_message && (
+                            <div className="bg-amber-50 border border-amber-200 text-amber-900 text-[12px] p-2.5 rounded-[6px] font-medium">
+                              {msg.responseMeta.fallback_message}
+                            </div>
+                          )}
+
+                          <div
+                            data-testid="bharat-explains-content"
+                            className="text-[14px] text-primary-900 leading-relaxed font-medium"
+                          >
+                            <SafeMarkdown content={msg.content} />
+                          </div>
+
+                          {msg.responseMeta && (msg.responseMeta.evidence_snippet || msg.responseMeta.source_reference) && (
+                            <div className="mt-4 pt-3 border-t border-neutral-100 flex flex-col items-start gap-2">
+                              <button
+                                className="flex items-center gap-1.5 text-[9px] font-bold text-primary-900 bg-neutral-50 border border-neutral-200 px-2.5 py-1 rounded-[4px] uppercase tracking-widest hover:bg-neutral-100 transition-colors shadow-sm"
+                                onClick={() => setActiveEvidence({
+                                  claim: t("ws.evidence.ai_explanation"),
+                                  evidence: msg.responseMeta?.evidence_snippet || t("ws.evidence.snippet_available"),
+                                  source: msg.responseMeta?.source_reference || t("ws.document")
+                                })}
+                              >
+                                {t("ws.evidence.source")} · {msg.responseMeta?.source_reference || 'Document'}
+                                <FileSearch className="w-3 h-3 ml-1 text-accent-500" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              
+                    )}
+                  </div>
+                );
+              })}
+
               {isLoading && (
                 <div className="flex flex-col gap-4 max-w-[90%] animate-pulse">
                    <div className="flex items-center gap-2">
                       <span className="w-1 h-2.5 bg-neutral-300 block"></span>
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">{t("ws.processing")}</span>
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
+                        {aiSession ? t("ai.status.processing") : t("ws.processing")}
+                      </span>
                     </div>
                 </div>
               )}
@@ -490,31 +638,31 @@ export function Workspace({ document, onBack, language, isTranslating = false }:
           {/* Assistant Input */}
           <div className="p-4 md:p-6 bg-white border-t border-neutral-200 z-20 shrink-0">
             <div className="relative flex items-center bg-white border border-neutral-300 rounded-[6px] focus-within:border-accent-500 transition-all shadow-sm">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
-                placeholder={t("ws.placeholder")} 
+                placeholder={t("ws.placeholder")}
                 className="w-full pl-4 pr-24 py-3 bg-transparent outline-none text-[14px] text-primary-900 font-medium placeholder-neutral-400"
                 disabled={isLoading}
               />
               <div className="absolute right-1.5 top-1.5 bottom-1.5 flex items-center gap-1">
                 {recognitionRef.current && (
-                  <button 
-                    onClick={toggleRecording} 
+                  <button
+                    onClick={toggleRecording}
                     disabled={isLoading}
                     className={`flex items-center justify-center w-8 h-8 rounded-[4px] transition-colors ${
-                      isRecording 
-                        ? 'text-white bg-error-600 shadow-[0_0_0_4px_rgba(220,38,38,0.2)] animate-pulse' 
+                      isRecording
+                        ? 'text-white bg-error-600 shadow-[0_0_0_4px_rgba(220,38,38,0.2)] animate-pulse'
                         : 'text-neutral-500 hover:text-primary-900 hover:bg-neutral-100'
                     }`}
                   >
                     <Mic className="h-4 w-4" />
                   </button>
                 )}
-                <button 
-                  onClick={() => handleAsk()} 
+                <button
+                  onClick={() => handleAsk()}
                   disabled={!inputValue.trim() || isLoading}
                   className="flex items-center justify-center w-8 h-8 rounded-[4px] text-white bg-primary-900 hover:bg-primary-800 disabled:opacity-50 disabled:bg-neutral-300 transition-colors"
                 >

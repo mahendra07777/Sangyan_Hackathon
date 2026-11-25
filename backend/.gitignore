@@ -13,5 +13,8 @@ __pycache__/
 .vscode/
 .idea/
 
+# Ephemeral Storage
+temporary_compare_storage/
+
 # General
 *.log
